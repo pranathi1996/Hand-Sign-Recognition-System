@@ -1,3 +1,4 @@
+import 'package:HandSignRecognitionSystem/report.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -5,6 +6,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flip_card/flip_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_native_image/flutter_native_image.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -55,17 +57,25 @@ class _HomePageState extends State<HomePage> {
   Future classifyImage() async {
     cardKey.currentState.toggleCard();
 
+    File compressedFile = await FlutterNativeImage.compressImage(
+        _imageFile.path,
+        quality: 98,
+        targetWidth: 100,
+        targetHeight: 100);
+
     await Tflite.loadModel(
         // model: "assets/model.tflite",
         // labels: "assets/labels.txt",
 
         model: "assets/model.tflite",
         labels: "assets/labels.txt",
-        numThreads: 1, // defaults to 1
-        isAsset:
-            true, // defaults to true, set to false to load resources outside assets
+        numThreads: 1,
+        // defaults to 1
+        isAsset: true,
+        // defaults to true, set to false to load resources outside assets
         useGpuDelegate: false);
-    List<dynamic> output = await Tflite.runModelOnImage(path: path);
+    List<dynamic> output =
+        await Tflite.runModelOnImage(path: compressedFile.path);
 
     setState(() {
       List indexList = output
@@ -134,7 +144,6 @@ class _HomePageState extends State<HomePage> {
       } else if (indexList.toString() == "[28]") {
         result = 'space';
       }
-
       confidence = confidenceList.toString();
       print("Output:" + output.toString());
     });
@@ -146,18 +155,35 @@ class _HomePageState extends State<HomePage> {
   Future<void> _cropImage() async {
     File cropped = await ImageCropper.cropImage(
       sourcePath: _imageFile.path,
-      // ratioX : 1.0,
-      // ratioY : 1.0,
+      ratioX : 1.0,
+      ratioY : 1.0,
       // maxWidth: 512,
       // maxHeight: 512,
       toolbarColor: Colors.purple,
       toolbarWidgetColor: Colors.white,
       toolbarTitle: 'Crop It',
     );
+    if(cropped!=null) {
+      File compressedFile = await FlutterNativeImage.compressImage(
+          cropped.path,
+          quality: 98,
+          targetWidth: 100,
+          targetHeight: 100);
+      setState(() {
+        _imageFile = compressedFile;
+      });
+    }
+    else{
+      File compressedFile = await FlutterNativeImage.compressImage(
+          _imageFile.path,
+          quality: 98,
+          targetWidth: 100,
+          targetHeight: 100);
+      setState(() {
+        _imageFile = compressedFile;
+      });
+    }
 
-    setState(() {
-      _imageFile = cropped ?? _imageFile;
-    });
   }
 
   // clear image
@@ -207,10 +233,10 @@ class _HomePageState extends State<HomePage> {
       drawer: MainDrawer(currentUser),
       bottomNavigationBar: CurvedNavigationBar(
         backgroundColor: Colors.green,
+
         items: <Widget>[
           Icon(Icons.photo_camera, size: 25),
           Icon(Icons.photo_library, size: 25),
-          Icon(Icons.videocam, size: 25),
         ],
         onTap: (index) {
           if (index == 0) {
@@ -218,12 +244,6 @@ class _HomePageState extends State<HomePage> {
           }
           if (index == 1) {
             _pickImage(ImageSource.gallery);
-          } else {
-            // open video.dart
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => Video()),
-            );
           }
         },
       ),
@@ -236,7 +256,8 @@ class _HomePageState extends State<HomePage> {
             FlipCard(
               key: cardKey,
               flipOnTouch: false,
-              direction: FlipDirection.HORIZONTAL, // default
+              direction: FlipDirection.HORIZONTAL,
+              // default
               front: Container(
                 height: MediaQuery.of(context).size.height / 2 + 100,
                 decoration: new BoxDecoration(
@@ -300,10 +321,15 @@ class _HomePageState extends State<HomePage> {
                       Text(
                         result != null ? result : "",
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 200,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red),
+                        style: result != null && result.length == 1
+                            ? TextStyle(
+                                fontSize: 200,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red)
+                            : TextStyle(
+                                fontSize: 100,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.red),
                       ),
                       Text(
                         confidence != null ? "Confidence: " + confidence : "",
